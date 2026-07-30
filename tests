@@ -1,0 +1,55 @@
+import json
+import os
+from pathlib import Path
+import pytest
+
+from todo.core import TodoList
+
+
+def test_add_and_list_and_persistence(tmp_path):
+    storage = tmp_path / "todos.json"
+    t = TodoList(storage_path=storage)
+    task = t.add_task("Buy milk")
+    assert task["id"] == 1
+    assert task["text"] == "Buy milk"
+    # New instance reads persisted data
+    t2 = TodoList(storage_path=storage)
+    tasks = t2.list_tasks()
+    assert any(x["text"] == "Buy milk" for x in tasks)
+
+
+def test_complete_and_delete(tmp_path):
+    storage = tmp_path / "todos.json"
+    t = TodoList(storage_path=storage)
+    t.add_task("Task one")
+    t.add_task("Task two")
+    t.complete_task(1)
+    tasks_all = t.list_tasks(show_completed=True)
+    assert any(x["id"] == 1 and x["completed"] for x in tasks_all)
+    t.delete_task(1)
+    tasks_after = t.list_tasks(show_completed=True)
+    assert not any(x["id"] == 1 for x in tasks_after)
+
+
+def test_clear_and_find(tmp_path):
+    storage = tmp_path / "todos.json"
+    t = TodoList(storage_path=storage)
+    t.add_task("Write report")
+    t.add_task("Buy milk")
+    found = t.find_tasks("write")
+    assert len(found) == 1 and found[0]["text"] == "Write report"
+    t.clear_tasks()
+    assert t.list_tasks() == []
+
+
+def test_import_export(tmp_path):
+    storage = tmp_path / "todos.json"
+    t = TodoList(storage_path=storage)
+    t.add_task("One")
+    t.add_task("Two")
+    export_file = tmp_path / "export.json"
+    t.export_json(export_file)
+    # Create new list and import
+    t2 = TodoList(storage_path=tmp_path / "other.json")
+    t2.import_json(export_file)
+    assert any(x["text"] == "One" for x in t2.list_tasks(show_completed=True))
